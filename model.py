@@ -6,7 +6,7 @@ from openai import OpenAI
 load_dotenv()
 
 # Initialize client with your secret "test key"
-client = OpenAI(api_key=os.getenv("test key"))
+client = OpenAI(api_key=os.getenv("test"))
 
 def draft_reply(subject, body):
     """Draft a short professional empathetic reply using OpenAI.
