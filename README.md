@@ -1,14 +1,28 @@
-# AI Communication Assistant (Enhanced)
+# 📧 AI Communication Assistant – Enhanced
 
-This enhanced version adds:
-- Analytics charts (priority counts, timeline)
-- AI reply generation (OpenAI) with fallback stub when no key
-- Improved urgency rules & topic extraction
-- Persistence to SQLite (emails.db) and processed_emails.csv
-- UI controls to generate/save replies and mark emails as Resolved
+An AI-powered email assistant built with **Streamlit** and **OpenAI**, designed to:
+- Upload customer email CSVs
+- Process and enrich emails with priority, sentiment, and topics
+- Store processed emails in a local SQLite database
+- Generate **AI-drafted replies** using OpenAI’s GPT models
+- Save, edit, and mark replies as resolved
+- Download enriched CSVs with replies
 
-## Run locally
-1. Create and activate a venv
-2. Install requirements: `pip install -r requirements.txt`
-3. Set your OpenAI API key as a user environment variable `OPENAI_API_KEY` or create a `.env` file
-4. Run: `streamlit run dashboard.py`
+---
+
+## 🚀 Features
+- 📊 Dashboard with key email metrics (total, urgent, pending, resolved)
+- 📈 Priority distribution bar chart and timeline chart
+- 📨 Queue of emails with **AI-generated draft replies**
+- ✍️ Edit and save replies directly in the app
+- ✅ Mark emails as resolved
+- 💾 Save to SQLite (`emails.db`) + export `processed_emails.csv`
+
+---
+
+## 🛠️ Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/pujapawar8304/ai-comm-assistant.git
+   cd ai-comm-assistant
