@@ -27,11 +27,24 @@ uploaded = st.file_uploader("Upload Email CSV", type=["csv"])
 
 if uploaded:
     with st.spinner("Processing and enriching emails..."):
-        # handle file-like object
         df_new = process_and_enrich(io.BytesIO(uploaded.read()))
+
+        # Debug info
+        st.write("➡️ Processed rows:", len(df_new))
+        st.dataframe(df_new.head())
+
+        # Always clear old DB (so metrics = this upload only)
+        conn = sqlite3.connect(str(DB_PATH))
+        c = conn.cursor()
+        c.execute("DELETE FROM emails")
+        conn.commit()
+        conn.close()
+
+        # Save fresh upload
         df_new.to_csv(PROCESSED_CSV, index=False)
         upsert_emails(df_new, db_path=DB_PATH)
-    st.success("✅ Processed and saved to DB + processed_emails.csv")
+
+    st.success("✅ Uploaded CSV processed and database updated!")
 
 df = load_processed_from_db()
 if df is None and PROCESSED_CSV.exists():
