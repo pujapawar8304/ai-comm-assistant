@@ -13,17 +13,19 @@ except ImportError:
     OpenAI = None
 
 load_dotenv()
-API_KEY = os.getenv("test")  # Make sure your .env has: test=YOUR_OPENAI_KEY
+API_KEY = os.getenv("test")  # .env must have: test=YOUR_OPENAI_KEY
 client = OpenAI(api_key=API_KEY) if OpenAI and API_KEY else None
 
 # -------------------- Filters & Keywords --------------------
 SUBJECT_FILTERS = ["support", "query", "request", "help"]
 URGENT_KEYWORDS = [
-    "urgent", "immediate", "immediately", "critical", "highly critical", "down", "blocked",
-    "inaccessible", "cannot access", "can't access", "cannot", "can't", "password", "reset link",
-    "charged twice", "billing error", "refund", "system is completely inaccessible", "servers are down"
+    "urgent", "immediate", "immediately", "critical", "highly critical", "down",
+    "blocked", "inaccessible", "cannot access", "can't access", "cannot", "can't",
+    "password", "reset link", "charged twice", "billing error", "refund",
+    "system is completely inaccessible", "servers are down"
 ]
-NEGATIVE_KEYWORDS = ["unable", "cannot", "can't", "error", "down", "inaccessible", "blocked", "urgent", "failure", "problem", "frustrat"]
+NEGATIVE_KEYWORDS = ["unable", "cannot", "can't", "error", "down",
+                     "inaccessible", "blocked", "urgent", "failure", "problem", "frustrat"]
 POSITIVE_KEYWORDS = ["thank you", "thanks", "appreciate", "great", "good", "excellent"]
 
 EMAIL_REGEX = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
@@ -41,25 +43,20 @@ DB_PATH = Path("emails.db")
 
 # -------------------- Email Processing --------------------
 def load_emails(file_path):
-    df = pd.read_csv(file_path, parse_dates=["sent_date"])
-    return df
+    return pd.read_csv(file_path, parse_dates=["sent_date"])
 
 def subject_filter_mask(df):
-    mask = df["subject"].str.lower().str.contains("|".join(SUBJECT_FILTERS), na=False)
-    return mask
+    return df["subject"].str.lower().str.contains("|".join(SUBJECT_FILTERS), na=False)
 
 def contains_any(text, keywords):
     if not isinstance(text, str):
         return False
-    t = text.lower()
-    return any(kw in t for kw in keywords)
+    return any(kw in text.lower() for kw in keywords)
 
 def classify_sentiment(row):
     text = f"{row.get('subject','')} {row.get('body','')}"
-    if contains_any(text, NEGATIVE_KEYWORDS):
-        return "Negative"
-    if contains_any(text, POSITIVE_KEYWORDS):
-        return "Positive"
+    if contains_any(text, NEGATIVE_KEYWORDS): return "Negative"
+    if contains_any(text, POSITIVE_KEYWORDS): return "Positive"
     return "Neutral"
 
 def classify_priority(row):
@@ -79,22 +76,18 @@ def tag_topics(text):
     t = str(text).lower()
     matched = []
     for label, kws in TOPIC_KEYWORDS.items():
-        for kw in kws:
-            if kw in t:
-                matched.append(label)
-                break
+        if any(kw in t for kw in kws):
+            matched.append(label)
     return matched if matched else None
 
 # -------------------- AI Reply --------------------
 def draft_reply(subject, body):
-    """Generate a short professional empathetic reply using OpenAI."""
     if not client:
-        return f"Hello,\n\nThanks for reaching out about \"{subject}\". We apologize for the trouble. Our team is looking into this and will get back to you shortly.\n\nBest regards,\nSupport Team"
+        return f"Hello,\n\nThanks for reaching out about \"{subject}\". Our team is looking into this and will get back shortly.\n\nBest regards,\nSupport Team"
 
-    prompt = f"""You are a helpful customer support agent. Write a concise, empathetic, and professional reply to the following customer email. Keep it actionable and ask for any missing info needed to resolve the issue.
+    prompt = f"""You are a helpful support agent. Write a short, empathetic, and professional reply.
 
 Subject: {subject}
-
 Message:
 {body}
 
@@ -110,10 +103,9 @@ Reply:"""
             max_tokens=200,
             temperature=0.6,
         )
-        text = response.choices[0].message.content.strip()
-        return text
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"[AI generation error: {e}] Hello, thanks for contacting support about '{subject}'. We'll follow up shortly."
+        return f"[AI error: {e}] Thanks for contacting support. We'll follow up shortly."
 
 # -------------------- Database --------------------
 def ensure_db(db_path=DB_PATH):
@@ -145,17 +137,17 @@ def upsert_emails(df, db_path=DB_PATH):
         sent_date = None
         sd = row.get("sent_date")
         if pd.notna(sd):
-            try:
-                sent_date = pd.to_datetime(sd).isoformat()
-            except Exception:
-                sent_date = str(sd)
-        topics = json.dumps(row.get("topics")) if row.get("topics") is not None else None
-        extracted_emails = json.dumps(row.get("extracted_emails")) if row.get("extracted_emails") is not None else None
-        extracted_phones = json.dumps(row.get("extracted_phones")) if row.get("extracted_phones") is not None else None
+            try: sent_date = pd.to_datetime(sd).isoformat()
+            except: sent_date = str(sd)
+        topics = json.dumps(row.get("topics")) if row.get("topics") else None
+        extracted_emails = json.dumps(row.get("extracted_emails")) if row.get("extracted_emails") else None
+        extracted_phones = json.dumps(row.get("extracted_phones")) if row.get("extracted_phones") else None
         ai_reply = row.get("ai_draft_reply") or row.get("ai_reply") or None
         status = row.get("status") or "Pending"
+
         c.execute("""INSERT OR REPLACE INTO emails
-            (id, sender, subject, body, sent_date, priority, sentiment, topics, extracted_emails, extracted_phones, ai_reply, status, updated_at)
+            (id, sender, subject, body, sent_date, priority, sentiment, topics,
+             extracted_emails, extracted_phones, ai_reply, status, updated_at)
             VALUES (
                 COALESCE((SELECT id FROM emails WHERE sender=? AND subject=? AND sent_date=?), NULL),
                 ?,?,?,?,?,?,?,?,?,?,?,?
@@ -183,11 +175,9 @@ def process_and_enrich(file_path):
     df["status"] = "Pending"
     try:
         df["sent_date"] = pd.to_datetime(df["sent_date"])
-    except Exception:
-        pass
+    except: pass
     return df
 
-# -------------------- Run Example --------------------
 if __name__ == "__main__":
     sample = Path("sample_emails.csv")
     if sample.exists():
