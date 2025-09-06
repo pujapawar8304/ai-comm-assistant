@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from email_utils import process_and_enrich, upsert_emails
 from model import draft_reply
+import io
 
 st.set_page_config(page_title="📧 AI Email Assistant (Full)", layout="wide")
 st.title("📧 AI Communication Assistant – Full")
