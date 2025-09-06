@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import sqlite3, json
+import sqlite3, json, io
 from pathlib import Path
 from datetime import datetime
 from email_utils import process_and_enrich, upsert_emails
@@ -27,7 +27,8 @@ uploaded = st.file_uploader("Upload Email CSV", type=["csv"])
 
 if uploaded:
     with st.spinner("Processing and enriching emails..."):
-        df_new = process_and_enrich(uploaded)
+        # handle file-like object
+        df_new = process_and_enrich(io.BytesIO(uploaded.read()))
         df_new.to_csv(PROCESSED_CSV, index=False)
         upsert_emails(df_new, db_path=DB_PATH)
     st.success("✅ Processed and saved to DB + processed_emails.csv")
@@ -43,7 +44,9 @@ if df is None:
 # Parse topics JSON safely
 if "topics" in df.columns and df["topics"].dtype == object:
     try:
-        df["topics"] = df["topics"].apply(lambda x: json.loads(x) if isinstance(x, str) and x.startswith('[') else x)
+        df["topics"] = df["topics"].apply(
+            lambda x: json.loads(x) if isinstance(x, str) and (x.startswith("[") or x.startswith("{")) else x
+        )
     except Exception:
         pass
 
@@ -73,8 +76,8 @@ display_cols = ["id","sender","subject","sent_date","priority","sentiment","stat
 display_cols = [c for c in display_cols if c in df.columns]
 st.dataframe(df[display_cols].sort_values(by=["priority","sent_date"], ascending=[False, False]).reset_index(drop=True))
 
-selected_id = st.number_input("Enter email id to inspect (use 'id' from table above)", min_value=0, step=1, value=0)
-selected_row = df[df["id"]==int(selected_id)].iloc[0] if selected_id and int(selected_id) in df["id"].values else None
+selected_id = st.number_input("Enter email id to inspect (use 'id' from table above)", min_value=1, step=1, value=1)
+selected_row = df[df["id"]==int(selected_id)].iloc[0] if int(selected_id) in df["id"].values else None
 
 if selected_row is not None:
     st.markdown(f"**From:** {selected_row['sender']}  \n**Subject:** {selected_row['subject']}  \n**Received:** {selected_row['sent_date']}  \n**Priority:** {selected_row['priority']}  \n**Sentiment:** {selected_row['sentiment']}  \n**Topics:** {selected_row['topics']}")
@@ -111,14 +114,16 @@ if selected_row is not None:
         conn.close()
         st.success("✅ Email marked as Resolved.")
 
-# -------------------- Bulk AI Reply Generator (from 2nd code) --------------------
+# -------------------- Bulk AI Reply Generator --------------------
 st.subheader("⚡ Bulk AI Reply Generator (Quick Mode)")
 
 if st.button("Generate AI Replies for All Emails"):
-    df["AI Reply"] = df.apply(lambda row: draft_reply(row["subject"], row["body"]), axis=1)
-    df.to_csv(PROCESSED_CSV, index=False)
+    with st.spinner("Generating replies..."):
+        df["ai_reply"] = df.apply(lambda row: draft_reply(row["subject"], row["body"]), axis=1)
+        df.to_csv(PROCESSED_CSV, index=False)
+        upsert_emails(df, DB_PATH)   # <-- FIX: update DB as well
     st.success("✅ AI Replies generated for all emails.")
-    st.dataframe(df[["sender","subject","AI Reply"]])
+    st.dataframe(df[["sender","subject","ai_reply"]])
 
     st.download_button(
         label="⬇️ Download processed_emails.csv",
